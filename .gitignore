@@ -1,0 +1,42 @@
+# Dependencies - ALL node_modules
+node_modules/
+*/node_modules/*
+frontend/node_modules/
+backend/node_modules/
+
+# Next.js
+.next/
+.next/cache/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+env/
+*.pyo
+*.pyd
+.Python
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# Build outputs
+dist/
+build/
+out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
