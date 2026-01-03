@@ -11,12 +11,24 @@ const api = axios.create({
   timeout: 10000, // 10 segundos timeout
 });
 
-// Mock data para desenvolvimento (quando backend não está rodando)
-const USE_MOCK_DATA = true; // Mude para false quando backend estiver pronto
+// Interceptor para adicionar token automaticamente
+api.interceptors.request.use(
+  (config) => {
+    // Adicionar token se disponível
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 export default api;
 
-// Funções mock para desenvolvimento
+// Funções mock para desenvolvimento (mantidas para compatibilidade)
 export const mockApi = {
   getSubscriptions: () => Promise.resolve([
     {

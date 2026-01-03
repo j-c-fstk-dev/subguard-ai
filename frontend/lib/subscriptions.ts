@@ -39,38 +39,86 @@ export interface CreateSubscriptionDto {
 
 export async function fetchSubscriptions(userId: string): Promise<Subscription[]> {
   try {
-    const response = await api.get(`/api/subscriptions`, {
-      params: { user_id: userId }
+    console.log('🔄 fetchSubscriptions chamado para userId:', userId);
+    
+    // Obter token do localStorage
+    const token = localStorage.getItem('access_token');
+    console.log('🔑 Token disponível:', token ? 'Sim' : 'Não');
+    
+    if (!token) {
+      console.warn('⚠️ Token não encontrado, retornando mock data');
+      return getMockSubscriptions();
+    }
+    
+    // Tentar API real com autenticação
+    const response = await api.get('/api/subscriptions', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
+    
+    console.log('✅ Resposta da API:', response.data);
     return response.data;
-  } catch (error) {
-    console.error('Error fetching subscriptions:', error);
-    // Return mock data for demo
+    
+  } catch (error: any) {
+    console.error('❌ Erro em fetchSubscriptions:', error.message);
+    console.error('Detalhes do erro:', error.response?.data || error);
+    
+    // Se for erro 401 (não autorizado)
+    if (error.response?.status === 401) {
+      console.log('🔒 Token expirado/inválido');
+      localStorage.removeItem('access_token');
+      // Não redirecionamos aqui, deixamos o componente lidar
+    }
+    
+    // Fallback para mock data
+    console.log('�� Usando mock data como fallback');
     return getMockSubscriptions();
   }
 }
 
 export async function createSubscription(data: CreateSubscriptionDto): Promise<Subscription> {
-  const response = await api.post('/api/subscriptions', data);
+  const token = localStorage.getItem('access_token');
+  const response = await api.post('/api/subscriptions', data, {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
   return response.data;
 }
 
 export async function updateSubscription(id: string, data: Partial<CreateSubscriptionDto>): Promise<Subscription> {
-  const response = await api.put(`/api/subscriptions/${id}`, data);
+  const token = localStorage.getItem('access_token');
+  const response = await api.put(`/api/subscriptions/${id}`, data, {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
   return response.data;
 }
 
 export async function deleteSubscription(id: string): Promise<void> {
-  await api.delete(`/api/subscriptions/${id}`);
+  const token = localStorage.getItem('access_token');
+  await api.delete(`/api/subscriptions/${id}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
 }
 
 export async function analyzeSubscription(id: string): Promise<any> {
-  const response = await api.get(`/api/subscriptions/${id}/analyze`);
+  const token = localStorage.getItem('access_token');
+  const response = await api.get(`/api/subscriptions/${id}/analyze`, {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
   return response.data;
 }
 
 // Mock data for development
 function getMockSubscriptions(): Subscription[] {
+  console.log('📋 Retornando mock data');
   return [
     {
       id: '1',

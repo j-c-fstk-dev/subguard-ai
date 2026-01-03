@@ -66,7 +66,7 @@ class Subscription(SubscriptionBase):
 # Optimization schemas
 class OptimizationRecommendationBase(BaseModel):
     subscription_id: str
-    action_type: str = Field(..., pattern="^(cancel|downgrade|switch|bundle|negotiate)$")  # CORRIGIDO: regex -> pattern
+    action_type: str = Field(..., regex="^(cancel|downgrade|switch|bundle|negotiate)$")
     current_plan: str
     recommended_plan: str
     current_cost: float
@@ -116,7 +116,7 @@ class SubscriptionAnalysis(BaseModel):
 
 # User schemas
 class UserBase(BaseModel):
-    email: str = Field(..., pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')  # CORRIGIDO: regex -> pattern
+    email: str = Field(..., regex=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8)
