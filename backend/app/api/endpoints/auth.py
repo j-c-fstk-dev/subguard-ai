@@ -21,10 +21,10 @@ async def register(
 ):
     """Register a new user"""
     
-    # Check if user already exists
     from sqlalchemy import select
     from app.core.database import UserDB
     
+    # Check if user already exists
     existing_user = await db.execute(
         select(UserDB).where(UserDB.email == user_data.email)
     )
@@ -37,7 +37,9 @@ async def register(
         )
     
     # Create new user
+    print(f"🔐 Criando usuário: {user_data.email}")
     hashed_password = get_password_hash(user_data.password)
+    print(f"🔐 Hash gerado: {hashed_password[:20]}...")
     
     new_user = UserDB(
         email=user_data.email,
@@ -47,6 +49,8 @@ async def register(
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
+    
+    print(f"✅ Usuário criado com sucesso: {new_user.id}")
     
     return User(
         id=new_user.id,
@@ -69,29 +73,51 @@ async def login(
     from sqlalchemy import select
     from app.core.database import UserDB
     
+    print(f"🔍 Tentando login para: {form_data.username}")
+    
     # Get user from database
     result = await db.execute(
         select(UserDB).where(UserDB.email == form_data.username)
     )
     user = result.scalar_one_or_none()
     
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user:
+        print(f"❌ Usuário não encontrado: {form_data.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Create access token
+    print(f"✅ Usuário encontrado: {user.id}")
+    print(f"🔐 Hash armazenado: {user.hashed_password[:20]}...")
+    
+    # Verify password
+    password_valid = verify_password(form_data.password, user.hashed_password)
+    
+    if not password_valid:
+        print(f"❌ Senha incorreta para: {form_data.username}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    print(f"✅ Senha correta para: {form_data.username}")
+    
+    # CORREÇÃO CRÍTICA: Usar email como subject, não ID
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.id},
+        data={"sub": user.email, "user_id": user.id},  # Email como subject
         expires_delta=access_token_expires
     )
     
+    print(f"✅ Token criado com sucesso para: {user.email}")
+    
     return Token(
         access_token=access_token,
-        expires_in=access_token_expires.seconds
+        expires_in=access_token_expires.seconds,
+        token_type="bearer"
     )
 
 @router.get("/me", response_model=User)
