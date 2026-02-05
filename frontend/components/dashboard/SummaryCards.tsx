@@ -1,8 +1,7 @@
 'use client';
-
 import { useEffect, useState } from 'react';
 import { DollarSign, CreditCard, TrendingDown, Target } from 'lucide-react';
-import { mockApi } from '@/lib/api';
+import api from '@/lib/api';
 
 interface SummaryData {
   totalMonthlySpend: number;
@@ -21,13 +20,12 @@ export default function SummaryCards({ userId }: { userId: string }) {
 
   async function loadSummary() {
     try {
-      // Usa mock data por enquanto
-      const data = await mockApi.getDashboardSummary();
+      const response = await api.get('/api/optimizations/dashboard/summary');
       setSummary({
-        totalMonthlySpend: data.total_monthly_spend,
-        totalSubscriptions: data.total_subscriptions,
-        potentialSavings: data.potential_savings,
-        optimizationsCompleted: data.optimizations_completed,
+        totalMonthlySpend: response.data.total_monthly_spend,
+        totalSubscriptions: response.data.total_subscriptions,
+        potentialSavings: response.data.potential_savings,
+        optimizationsCompleted: response.data.optimizations_completed,
       });
     } catch (error) {
       console.error('Failed to load summary:', error);

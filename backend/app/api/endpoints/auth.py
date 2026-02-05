@@ -63,13 +63,11 @@ async def register(
         updated_at=new_user.updated_at
     )
 
-@router.post("/token", response_model=Token)
-async def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: AsyncSession = Depends(get_db)
+async def login_handler(
+    form_data: OAuth2PasswordRequestForm,
+    db: AsyncSession
 ):
-    """Login user and return access token"""
-    
+    """Shared login logic"""
     from sqlalchemy import select
     from app.core.database import UserDB
     
@@ -90,7 +88,6 @@ async def login(
         )
     
     print(f"✅ Usuário encontrado: {user.id}")
-    print(f"🔐 Hash armazenado: {user.hashed_password[:20]}...")
     
     # Verify password
     password_valid = verify_password(form_data.password, user.hashed_password)
@@ -105,10 +102,10 @@ async def login(
     
     print(f"✅ Senha correta para: {form_data.username}")
     
-    # CORREÇÃO CRÍTICA: Usar email como subject, não ID
+    # Create token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.email, "user_id": user.id},  # Email como subject
+        data={"sub": user.email, "user_id": user.id},
         expires_delta=access_token_expires
     )
     
@@ -119,6 +116,22 @@ async def login(
         expires_in=access_token_expires.seconds,
         token_type="bearer"
     )
+
+@router.post("/token", response_model=Token)
+async def login_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db)
+):
+    """OAuth2 compatible token login"""
+    return await login_handler(form_data, db)
+
+@router.post("/login", response_model=Token)
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db)
+):
+    """Alternative login endpoint (same as /token)"""
+    return await login_handler(form_data, db)
 
 @router.get("/me", response_model=User)
 async def get_me(

@@ -5,7 +5,6 @@ import logging
 
 from app.core.config import settings
 
-# Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -13,7 +12,8 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    redirect_slashes=False  # 🔥 CRUCIAL para Codespaces!
 )
 
 # CORS middleware
@@ -25,7 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Incluir routers - importar aqui para evitar circular dependencies
+# Incluir routers
 from app.api.endpoints import auth, subscriptions, optimizations
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
@@ -45,15 +45,11 @@ async def root():
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
-# Test endpoint para verificar se o Gemini está funcionando
 @app.get("/api/test/gemini")
 async def test_gemini():
-    """Testa a conexão com a API Gemini"""
     try:
         from app.services.gemini_service import GeminiService
         service = GeminiService()
-        
-        # Teste simples
         response = await service.generate_text("Responda apenas com 'OK' se estiver funcionando.")
         return {
             "status": "success",
