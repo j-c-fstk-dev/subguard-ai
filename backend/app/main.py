@@ -19,7 +19,12 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://redesigned-rotary-phone-wv7947qj7wx26rg-3000.app.github.dev",
+        "https://redesigned-rotary-phone-wv7947qj7wx26rg-8000.app.github.dev",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
