@@ -188,3 +188,125 @@ async def analyze_subscriptions_async(user_id: str, db: AsyncSession):
                 
     except Exception as e:
         logger.error(f"Error in background analysis: {e}")
+
+
+@router.post("/", response_model=Subscription)
+async def create_subscription_endpoint(
+    subscription_data: SubscriptionCreate,
+    current_user = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a new subscription"""
+    try:
+        from datetime import datetime
+        
+        new_subscription = SubscriptionDB(
+            user_id=current_user.id,
+            service_name=subscription_data.service_name,
+            plan_name=subscription_data.plan_name,
+            monthly_cost=subscription_data.monthly_cost,
+            billing_cycle=subscription_data.billing_cycle,
+            service_category=subscription_data.service_category,
+            status=subscription_data.status or 'active',
+            detection_source=subscription_data.detection_source or 'manual',
+            notes=subscription_data.notes,
+            start_date=subscription_data.start_date or datetime.now(),
+            next_billing_date=subscription_data.next_billing_date,
+            confidence_score=100.0,
+        )
+        
+        db.add(new_subscription)
+        await db.commit()
+        await db.refresh(new_subscription)
+        
+        return Subscription(
+            id=str(new_subscription.id),
+            user_id=str(new_subscription.user_id),
+            service_name=new_subscription.service_name,
+            service_category=new_subscription.service_category,
+            plan_name=new_subscription.plan_name,
+            monthly_cost=new_subscription.monthly_cost,
+            billing_cycle=new_subscription.billing_cycle,
+            status=new_subscription.status,
+            detection_source=new_subscription.detection_source,
+            start_date=new_subscription.start_date.isoformat() if new_subscription.start_date else "",
+            next_billing_date=new_subscription.next_billing_date.isoformat() if new_subscription.next_billing_date else None,
+            last_used_date=new_subscription.last_used_date.isoformat() if new_subscription.last_used_date else None,
+            confidence_score=new_subscription.confidence_score or 0.0,
+            notes=new_subscription.notes,
+            usage_frequency=None,
+            estimated_value_score=None,
+            metadata={},
+            created_at=new_subscription.created_at.isoformat() if new_subscription.created_at else "",
+            updated_at=new_subscription.updated_at.isoformat() if new_subscription.updated_at else ""
+        )
+    except Exception as e:
+        logger.error(f"Error creating subscription: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/{subscription_id}", response_model=Subscription)
+async def update_subscription_endpoint(
+    subscription_id: str,
+    subscription_data: SubscriptionUpdate,
+    current_user = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update a subscription"""
+    result = await db.execute(
+        select(SubscriptionDB).where(SubscriptionDB.id == subscription_id)
+    )
+    subscription = result.scalar_one_or_none()
+    
+    if not subscription or subscription.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    
+    # Update fields
+    for field, value in subscription_data.dict(exclude_unset=True).items():
+        setattr(subscription, field, value)
+    
+    await db.commit()
+    await db.refresh(subscription)
+    
+    return Subscription(
+        id=str(subscription.id),
+        user_id=str(subscription.user_id),
+        service_name=subscription.service_name,
+        service_category=subscription.service_category,
+        plan_name=subscription.plan_name,
+        monthly_cost=subscription.monthly_cost,
+        billing_cycle=subscription.billing_cycle,
+        status=subscription.status,
+        detection_source=subscription.detection_source,
+        start_date=subscription.start_date.isoformat() if subscription.start_date else "",
+        next_billing_date=subscription.next_billing_date.isoformat() if subscription.next_billing_date else None,
+        last_used_date=subscription.last_used_date.isoformat() if subscription.last_used_date else None,
+        confidence_score=subscription.confidence_score or 0.0,
+        notes=subscription.notes,
+        usage_frequency=None,
+        estimated_value_score=None,
+        metadata={},
+        created_at=subscription.created_at.isoformat() if subscription.created_at else "",
+        updated_at=subscription.updated_at.isoformat() if subscription.updated_at else ""
+    )
+
+
+@router.delete("/{subscription_id}")
+async def delete_subscription_endpoint(
+    subscription_id: str,
+    current_user = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Delete a subscription"""
+    result = await db.execute(
+        select(SubscriptionDB).where(SubscriptionDB.id == subscription_id)
+    )
+    subscription = result.scalar_one_or_none()
+    
+    if not subscription or subscription.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    
+    await db.delete(subscription)
+    await db.commit()
+    
+    return {"success": True, "message": "Subscription deleted"}

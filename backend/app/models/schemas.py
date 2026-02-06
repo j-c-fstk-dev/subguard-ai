@@ -27,38 +27,47 @@ class SubscriptionBase(BaseModel):
     service_category: str = Field(..., min_length=1, max_length=50)
     plan_name: str = Field(..., min_length=1, max_length=100)
     monthly_cost: float = Field(..., gt=0)
-    billing_cycle: BillingCycle
-    status: SubscriptionStatus = SubscriptionStatus.ACTIVE
-    detection_source: Optional[DetectionSource] = None
+    billing_cycle: str  # Mudei de BillingCycle para str para aceitar qualquer valor
+    status: Optional[str] = "active"
+    detection_source: Optional[str] = "manual"
 
 class SubscriptionCreate(SubscriptionBase):
-    user_id: str
+    # REMOVIDO user_id - vem do token!
     start_date: Optional[datetime] = None
     next_billing_date: Optional[datetime] = None
     last_used_date: Optional[datetime] = None
-    confidence_score: float = Field(default=1.0, ge=0, le=1)
     notes: Optional[str] = None
-    metadata: Dict = Field(default_factory=dict)
 
 class SubscriptionUpdate(BaseModel):
+    service_name: Optional[str] = None
+    service_category: Optional[str] = None
     plan_name: Optional[str] = None
     monthly_cost: Optional[float] = None
-    billing_cycle: Optional[BillingCycle] = None
-    status: Optional[SubscriptionStatus] = None
+    billing_cycle: Optional[str] = None
+    status: Optional[str] = None
     last_used_date: Optional[datetime] = None
     notes: Optional[str] = None
 
-class Subscription(SubscriptionBase):
+class Subscription(BaseModel):
     id: str
     user_id: str
-    start_date: datetime
-    next_billing_date: Optional[datetime]
-    last_used_date: Optional[datetime]
+    service_name: str
+    service_category: str
+    plan_name: str
+    monthly_cost: float
+    billing_cycle: str
+    status: str
+    detection_source: Optional[str] = None
+    start_date: str  # Mudei para str porque retorna ISO string
+    next_billing_date: Optional[str] = None
+    last_used_date: Optional[str] = None
     confidence_score: float
-    notes: Optional[str]
+    notes: Optional[str] = None
+    usage_frequency: Optional[str] = None
+    estimated_value_score: Optional[float] = None
     metadata: Dict
-    created_at: datetime
-    updated_at: datetime
+    created_at: str
+    updated_at: str
     
     class Config:
         from_attributes = True
@@ -66,7 +75,7 @@ class Subscription(SubscriptionBase):
 # Optimization schemas
 class OptimizationRecommendationBase(BaseModel):
     subscription_id: str
-    action_type: str = Field(..., pattern="^(cancel|downgrade|switch|bundle|negotiate)$")  # CORRIGIDO: regex -> pattern
+    action_type: str = Field(..., pattern="^(cancel|downgrade|switch|bundle|negotiate)$")
     current_plan: str
     recommended_plan: str
     current_cost: float
@@ -116,7 +125,7 @@ class SubscriptionAnalysis(BaseModel):
 
 # User schemas
 class UserBase(BaseModel):
-    email: str = Field(..., pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')  # CORRIGIDO: regex -> pattern
+    email: str = Field(..., pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8)
