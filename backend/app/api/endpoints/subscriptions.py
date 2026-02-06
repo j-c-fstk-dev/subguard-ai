@@ -128,13 +128,16 @@ async def get_subscription(
         updated_at=subscription.updated_at.isoformat() if subscription.updated_at else ""
     )
 
-@router.get("/{subscription_id}/analyze", response_model=SubscriptionAnalysis)
+@router.post("/{subscription_id}/analyze")
 async def analyze_subscription(
     subscription_id: str,
     current_user = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Analyze subscription for optimization opportunities"""
+    """Analyze subscription with AI"""
+    from app.services.ai_analyzer import ai_analyzer
+    from datetime import datetime
+    
     result = await db.execute(
         select(SubscriptionDB).where(SubscriptionDB.id == subscription_id)
     )
@@ -143,10 +146,24 @@ async def analyze_subscription(
     if not subscription or subscription.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Subscription not found")
     
-    optimizer = SubscriptionOptimizer()
-    analysis = await optimizer.analyze(subscription)
+    # Converte para dict
+    sub_dict = {
+        'service_name': subscription.service_name,
+        'plan_name': subscription.plan_name,
+        'monthly_cost': subscription.monthly_cost,
+        'service_category': subscription.service_category,
+        'last_used_date': subscription.last_used_date.isoformat() if subscription.last_used_date else None,
+    }
     
-    return analysis
+    # Análise IA
+    analysis = await ai_analyzer.analyze_subscription(sub_dict)
+    
+    return {
+        "subscription_id": str(subscription_id),
+        "service_name": subscription.service_name,
+        "analysis": analysis,
+        "timestamp": datetime.now().isoformat()
+    }
 
 @router.post("/{subscription_id}/optimize", response_model=OptimizationRecommendation)
 async def optimize_subscription(

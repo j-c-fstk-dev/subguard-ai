@@ -1,12 +1,13 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { MoreVertical, Search, Plus, Pencil, Trash2 } from 'lucide-react';
+import { MoreVertical, Search, Plus, Pencil, Trash2, TrendingUp, Sparkles } from 'lucide-react';
 import { fetchSubscriptions, deleteSubscription } from '@/lib/subscriptions';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { Input } from '@/components/ui/input';
 import SubscriptionModal from './SubscriptionModal';
+import api from '@/lib/api';
 
 interface Subscription {
   id: string;
@@ -26,6 +27,7 @@ export default function SubscriptionList({ userId }: { userId: string }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadSubscriptions();
@@ -48,7 +50,7 @@ export default function SubscriptionList({ userId }: { userId: string }) {
 
     try {
       await deleteSubscription(id);
-      await loadSubscriptions(); // Reload
+      await loadSubscriptions();
     } catch (error) {
       console.error('Error deleting subscription:', error);
       alert('Failed to delete subscription');
@@ -58,6 +60,42 @@ export default function SubscriptionList({ userId }: { userId: string }) {
   const handleEdit = (sub: Subscription) => {
     setEditingSubscription(sub);
     setModalOpen(true);
+  };
+
+  const handleAnalyze = async (id: string, name: string) => {
+    setAnalyzingId(id);
+    try {
+      const response = await api.post(`/api/subscriptions/${id}/analyze`);
+      const { analysis } = response.data;
+      
+      // Formata a mensagem
+      const savingsText = analysis.monthly_savings > 0 
+        ? `💰 Economia potencial: R$ ${analysis.monthly_savings.toFixed(2)}/mês`
+        : '✅ Mantém o plano atual';
+      
+      const message = `
+🤖 Análise IA - ${name}
+
+${savingsText}
+
+📊 Recomendação: ${analysis.recommendation_type}
+📈 Confiança: ${(analysis.confidence * 100).toFixed(0)}%
+
+💡 ${analysis.reasoning}
+
+${analysis.suggested_plan ? `📋 Plano sugerido: ${analysis.suggested_plan}` : ''}
+
+✨ Próximos passos:
+${analysis.action_steps.map((step: string, i: number) => `${i + 1}. ${step}`).join('\n')}
+      `.trim();
+      
+      alert(message);
+    } catch (error) {
+      console.error('Error analyzing subscription:', error);
+      alert('Failed to analyze subscription. Please try again.');
+    } finally {
+      setAnalyzingId(null);
+    }
   };
 
   const handleModalClose = () => {
@@ -71,11 +109,30 @@ export default function SubscriptionList({ userId }: { userId: string }) {
 
   const totalMonthly = subscriptions.reduce((sum, sub) => sum + sub.monthly_cost, 0);
 
+  const getServiceIcon = (name: string) => {
+    const initial = name.charAt(0).toUpperCase();
+    const colors = [
+      'bg-blue-100 text-blue-600',
+      'bg-purple-100 text-purple-600',
+      'bg-green-100 text-green-600',
+      'bg-red-100 text-red-600',
+      'bg-yellow-100 text-yellow-600',
+    ];
+    const colorIndex = name.charCodeAt(0) % colors.length;
+    
+    return (
+      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colors[colorIndex]}`}>
+        <span className="font-semibold text-lg">{initial}</span>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <Card>
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          <span className="ml-3 text-neutral-600">Loading subscriptions...</span>
         </div>
       </Card>
     );
@@ -131,14 +188,19 @@ export default function SubscriptionList({ userId }: { userId: string }) {
                 </thead>
                 <tbody>
                   {filteredSubscriptions.map((sub) => (
-                    <tr key={sub.id} className="border-b border-neutral-100 hover:bg-neutral-50">
+                    <tr key={sub.id} className="border-b border-neutral-100 hover:bg-neutral-50 transition">
                       <td className="py-4 px-4">
-                        <div className="font-medium text-neutral-900">{sub.service_name}</div>
-                        {sub.last_used_date && (
-                          <div className="text-sm text-neutral-500">
-                            Last used: {new Date(sub.last_used_date).toLocaleDateString()}
+                        <div className="flex items-center gap-3">
+                          {getServiceIcon(sub.service_name)}
+                          <div>
+                            <div className="font-medium text-neutral-900">{sub.service_name}</div>
+                            {sub.last_used_date && (
+                              <div className="text-sm text-neutral-500">
+                                Last used: {new Date(sub.last_used_date).toLocaleDateString()}
+                              </div>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </td>
                       <td className="py-4 px-4 text-neutral-700">{sub.plan_name}</td>
                       <td className="py-4 px-4">
@@ -153,6 +215,18 @@ export default function SubscriptionList({ userId }: { userId: string }) {
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAnalyze(sub.id, sub.service_name)}
+                            disabled={analyzingId === sub.id}
+                          >
+                            {analyzingId === sub.id ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
+                            ) : (
+                              <Sparkles className="w-4 h-4 text-purple-600" />
+                            )}
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
