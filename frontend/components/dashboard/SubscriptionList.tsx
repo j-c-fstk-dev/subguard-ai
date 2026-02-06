@@ -1,12 +1,13 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { MoreVertical, Search, Plus, Pencil, Trash2, TrendingUp, Sparkles } from 'lucide-react';
+import { MoreVertical, Search, Plus, Pencil, Trash2, Sparkles } from 'lucide-react';
 import { fetchSubscriptions, deleteSubscription } from '@/lib/subscriptions';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { Input } from '@/components/ui/input';
 import SubscriptionModal from './SubscriptionModal';
+import AIAnalysisModal from './AIAnalysisModal';
 import api from '@/lib/api';
 
 interface Subscription {
@@ -21,6 +22,15 @@ interface Subscription {
   billing_cycle?: string;
 }
 
+interface AIAnalysis {
+  recommendation_type: string;
+  monthly_savings: number;
+  confidence: number;
+  reasoning: string;
+  suggested_plan?: string;
+  action_steps: string[];
+}
+
 export default function SubscriptionList({ userId }: { userId: string }) {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,6 +38,11 @@ export default function SubscriptionList({ userId }: { userId: string }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+  
+  // AI Analysis Modal State
+  const [analysisModalOpen, setAnalysisModalOpen] = useState(false);
+  const [currentAnalysis, setCurrentAnalysis] = useState<AIAnalysis | null>(null);
+  const [analyzedServiceName, setAnalyzedServiceName] = useState('');
 
   useEffect(() => {
     loadSubscriptions();
@@ -64,35 +79,19 @@ export default function SubscriptionList({ userId }: { userId: string }) {
 
   const handleAnalyze = async (id: string, name: string) => {
     setAnalyzingId(id);
+    setAnalyzedServiceName(name);
+    setAnalysisModalOpen(true);
+    setCurrentAnalysis(null);
+    
     try {
       const response = await api.post(`/api/subscriptions/${id}/analyze`);
       const { analysis } = response.data;
-      
-      // Formata a mensagem
-      const savingsText = analysis.monthly_savings > 0 
-        ? `💰 Economia potencial: R$ ${analysis.monthly_savings.toFixed(2)}/mês`
-        : '✅ Mantém o plano atual';
-      
-      const message = `
-🤖 Análise IA - ${name}
-
-${savingsText}
-
-📊 Recomendação: ${analysis.recommendation_type}
-📈 Confiança: ${(analysis.confidence * 100).toFixed(0)}%
-
-💡 ${analysis.reasoning}
-
-${analysis.suggested_plan ? `📋 Plano sugerido: ${analysis.suggested_plan}` : ''}
-
-✨ Próximos passos:
-${analysis.action_steps.map((step: string, i: number) => `${i + 1}. ${step}`).join('\n')}
-      `.trim();
-      
-      alert(message);
+      setCurrentAnalysis(analysis);
     } catch (error) {
       console.error('Error analyzing subscription:', error);
+      setCurrentAnalysis(null);
       alert('Failed to analyze subscription. Please try again.');
+      setAnalysisModalOpen(false);
     } finally {
       setAnalyzingId(null);
     }
@@ -103,28 +102,49 @@ ${analysis.action_steps.map((step: string, i: number) => `${i + 1}. ${step}`).jo
     setEditingSubscription(null);
   };
 
+  const handleAnalysisModalClose = () => {
+    setAnalysisModalOpen(false);
+    setCurrentAnalysis(null);
+    setAnalyzedServiceName('');
+  };
+
   const filteredSubscriptions = subscriptions.filter((sub) =>
     sub.service_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const totalMonthly = subscriptions.reduce((sum, sub) => sum + sub.monthly_cost, 0);
 
-  const getServiceIcon = (name: string) => {
-    const initial = name.charAt(0).toUpperCase();
-    const colors = [
-      'bg-blue-100 text-blue-600',
-      'bg-purple-100 text-purple-600',
-      'bg-green-100 text-green-600',
-      'bg-red-100 text-red-600',
-      'bg-yellow-100 text-yellow-600',
-    ];
-    const colorIndex = name.charCodeAt(0) % colors.length;
-    
-    return (
-      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colors[colorIndex]}`}>
-        <span className="font-semibold text-lg">{initial}</span>
-      </div>
-    );
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(value);
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('pt-BR');
+  };
+
+  // Obter emoji para o avatar
+  const getServiceAvatar = (serviceName: string) => {
+    const avatars: { [key: string]: string } = {
+      'Netflix': '🎬',
+      'Spotify': '🎵',
+      'Amazon': '📦',
+      'Prime': '📦',
+      'ChatGPT': '🤖',
+      'Adobe': '🎨',
+      'YouTube': '▶️',
+      'Disney': '🏰',
+    };
+
+    for (const [key, emoji] of Object.entries(avatars)) {
+      if (serviceName.toLowerCase().includes(key.toLowerCase())) {
+        return emoji;
+      }
+    }
+    return serviceName.charAt(0).toUpperCase();
   };
 
   if (loading) {
@@ -141,7 +161,7 @@ ${analysis.action_steps.map((step: string, i: number) => `${i + 1}. ${step}`).jo
   return (
     <>
       <Card>
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h2 className="text-2xl font-bold text-neutral-900">Your Subscriptions</h2>
             <p className="text-neutral-600 mt-1">Manage all your recurring payments</p>
@@ -179,49 +199,61 @@ ${analysis.action_steps.map((step: string, i: number) => `${i + 1}. ${step}`).jo
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-neutral-200">
-                    <th className="text-left py-3 px-4 font-semibold text-neutral-700">Service</th>
-                    <th className="text-left py-3 px-4 font-semibold text-neutral-700">Plan</th>
-                    <th className="text-left py-3 px-4 font-semibold text-neutral-700">Monthly Cost</th>
-                    <th className="text-left py-3 px-4 font-semibold text-neutral-700">Status</th>
-                    <th className="text-right py-3 px-4 font-semibold text-neutral-700">Actions</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-neutral-700">Service</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-neutral-700">Plan</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-neutral-700">Monthly Cost</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-neutral-700">Status</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-neutral-700">Next Billing</th>
+                    <th className="text-right py-3 px-4 text-sm font-semibold text-neutral-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredSubscriptions.map((sub) => (
-                    <tr key={sub.id} className="border-b border-neutral-100 hover:bg-neutral-50 transition">
+                  {filteredSubscriptions.map((subscription) => (
+                    <tr 
+                      key={subscription.id} 
+                      className="border-b border-neutral-100 hover:bg-neutral-50 transition-colors duration-150 group"
+                    >
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-3">
-                          {getServiceIcon(sub.service_name)}
+                          <div className="w-11 h-11 bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform duration-200">
+                            {getServiceAvatar(subscription.service_name)}
+                          </div>
                           <div>
-                            <div className="font-medium text-neutral-900">{sub.service_name}</div>
-                            {sub.last_used_date && (
-                              <div className="text-sm text-neutral-500">
-                                Last used: {new Date(sub.last_used_date).toLocaleDateString()}
-                              </div>
-                            )}
+                            <p className="font-semibold text-neutral-900">{subscription.service_name}</p>
+                            <p className="text-xs text-neutral-500">
+                              Last used: {formatDate(subscription.last_used_date)}
+                            </p>
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-4 text-neutral-700">{sub.plan_name}</td>
                       <td className="py-4 px-4">
-                        <span className="font-semibold text-neutral-900">
-                          R$ {sub.monthly_cost.toFixed(2)}
-                        </span>
+                        <p className="font-medium text-neutral-700">{subscription.plan_name}</p>
                       </td>
                       <td className="py-4 px-4">
-                        <Badge variant={sub.status === 'active' ? 'success' : 'default'}>
-                          {sub.status}
+                        <p className="font-bold text-neutral-900">{formatCurrency(subscription.monthly_cost)}</p>
+                      </td>
+                      <td className="py-4 px-4">
+                        <Badge 
+                          variant={subscription.status === 'active' ? 'success' : subscription.status === 'cancelled' ? 'danger' : 'warning'}
+                          size="sm"
+                          dot
+                        >
+                          {subscription.status}
                         </Badge>
+                      </td>
+                      <td className="py-4 px-4">
+                        <p className="text-sm text-neutral-700">{formatDate(subscription.next_billing_date)}</p>
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center justify-end gap-2">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleAnalyze(sub.id, sub.service_name)}
-                            disabled={analyzingId === sub.id}
+                            onClick={() => handleAnalyze(subscription.id, subscription.service_name)}
+                            disabled={analyzingId === subscription.id}
+                            title="Analyze with AI"
                           >
-                            {analyzingId === sub.id ? (
+                            {analyzingId === subscription.id ? (
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
                             ) : (
                               <Sparkles className="w-4 h-4 text-purple-600" />
@@ -230,14 +262,16 @@ ${analysis.action_steps.map((step: string, i: number) => `${i + 1}. ${step}`).jo
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleEdit(sub)}
+                            onClick={() => handleEdit(subscription)}
+                            title="Edit"
                           >
                             <Pencil className="w-4 h-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDelete(sub.id, sub.service_name)}
+                            onClick={() => handleDelete(subscription.id, subscription.service_name)}
+                            title="Delete"
                           >
                             <Trash2 className="w-4 h-4 text-red-600" />
                           </Button>
@@ -250,27 +284,36 @@ ${analysis.action_steps.map((step: string, i: number) => `${i + 1}. ${step}`).jo
             </div>
 
             {/* Total */}
-            <div className="mt-6 pt-6 border-t border-neutral-200 flex justify-between items-center">
-              <div className="text-neutral-600">
-                Total: <span className="font-semibold">{filteredSubscriptions.length}</span> subscriptions
-              </div>
+            <div className="mt-6 pt-6 border-t border-neutral-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+              <p className="text-sm text-neutral-600">
+                Total: <span className="font-semibold text-neutral-900">{filteredSubscriptions.length}</span> subscription{filteredSubscriptions.length !== 1 ? 's' : ''}
+              </p>
               <div className="text-right">
-                <div className="text-sm text-neutral-600">Monthly Total</div>
-                <div className="text-2xl font-bold text-neutral-900">
-                  R$ {totalMonthly.toFixed(2)}
-                </div>
+                <p className="text-sm text-neutral-600 mb-1">Monthly Total</p>
+                <p className="text-2xl font-bold text-neutral-900">
+                  {formatCurrency(totalMonthly)}
+                </p>
               </div>
             </div>
           </>
         )}
       </Card>
 
-      {/* Modal */}
+      {/* Subscription Modal (Add/Edit) */}
       <SubscriptionModal
         open={modalOpen}
         onClose={handleModalClose}
         onSuccess={loadSubscriptions}
         subscription={editingSubscription}
+      />
+
+      {/* AI Analysis Modal */}
+      <AIAnalysisModal
+        open={analysisModalOpen}
+        onClose={handleAnalysisModalClose}
+        serviceName={analyzedServiceName}
+        analysis={currentAnalysis}
+        loading={analyzingId !== null}
       />
     </>
   );
