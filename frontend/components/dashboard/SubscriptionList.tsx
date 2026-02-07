@@ -43,6 +43,8 @@ export default function SubscriptionList({ userId }: { userId: string }) {
   const [analysisModalOpen, setAnalysisModalOpen] = useState(false);
   const [currentAnalysis, setCurrentAnalysis] = useState<AIAnalysis | null>(null);
   const [analyzedServiceName, setAnalyzedServiceName] = useState('');
+  const [analyzedSubscriptionId, setAnalyzedSubscriptionId] = useState<string>('');
+  const [analyzedCurrentCost, setAnalyzedCurrentCost] = useState<number>(0);
 
   useEffect(() => {
     loadSubscriptions();
@@ -77,25 +79,27 @@ export default function SubscriptionList({ userId }: { userId: string }) {
     setModalOpen(true);
   };
 
-  const handleAnalyze = async (id: string, name: string) => {
-    setAnalyzingId(id);
-    setAnalyzedServiceName(name);
-    setAnalysisModalOpen(true);
+  const handleAnalyze = async (id: string, name: string, cost: number) => {
+  setAnalyzingId(id);
+  setAnalyzedServiceName(name);
+  setAnalyzedSubscriptionId(id);
+  setAnalyzedCurrentCost(cost);
+  setAnalysisModalOpen(true);
+  setCurrentAnalysis(null);
+  
+  try {
+    const response = await api.post(`/api/subscriptions/${id}/analyze`);
+    const { analysis } = response.data;
+    setCurrentAnalysis(analysis);
+  } catch (error) {
+    console.error('Error analyzing subscription:', error);
     setCurrentAnalysis(null);
-    
-    try {
-      const response = await api.post(`/api/subscriptions/${id}/analyze`);
-      const { analysis } = response.data;
-      setCurrentAnalysis(analysis);
-    } catch (error) {
-      console.error('Error analyzing subscription:', error);
-      setCurrentAnalysis(null);
-      alert('Failed to analyze subscription. Please try again.');
-      setAnalysisModalOpen(false);
-    } finally {
-      setAnalyzingId(null);
-    }
-  };
+    alert('Failed to analyze subscription. Please try again.');
+    setAnalysisModalOpen(false);
+  } finally {
+    setAnalyzingId(null);
+  }
+};
 
   const handleModalClose = () => {
     setModalOpen(false);
@@ -249,7 +253,7 @@ export default function SubscriptionList({ userId }: { userId: string }) {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleAnalyze(subscription.id, subscription.service_name)}
+                            onClick={() => handleAnalyze(subscription.id, subscription.service_name, subscription.monthly_cost)}
                             disabled={analyzingId === subscription.id}
                             title="Analyze with AI"
                           >
@@ -311,6 +315,9 @@ export default function SubscriptionList({ userId }: { userId: string }) {
       <AIAnalysisModal
         open={analysisModalOpen}
         onClose={handleAnalysisModalClose}
+        onSuccess={loadSubscriptions}
+        subscriptionId={analyzedSubscriptionId}
+        currentCost={analyzedCurrentCost}
         serviceName={analyzedServiceName}
         analysis={currentAnalysis}
         loading={analyzingId !== null}

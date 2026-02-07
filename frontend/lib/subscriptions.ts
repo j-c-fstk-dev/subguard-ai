@@ -67,3 +67,21 @@ export async function updateSubscription(id: string, data: Partial<CreateSubscri
 export async function deleteSubscription(id: string): Promise<void> {
   await api.delete(`/api/subscriptions/${id}`);
 }
+
+export async function analyzeSubscription(id: string) {
+  const response = await api.post(`/api/subscriptions/${id}/analyze`);
+  return response.data;
+}
+
+export async function applyRecommendation(
+  id: string, 
+  data: {
+    action: string;
+    suggested_plan?: string;
+    new_cost?: number;
+    savings: number;
+  }
+) {
+  const response = await api.post(`/api/subscriptions/${id}/apply-recommendation`, data);
+  return response.data;
+}

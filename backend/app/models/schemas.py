@@ -164,3 +164,18 @@ class MonthlyTrend(BaseModel):
     spend: float
     savings: float
     subscriptions: int
+
+# Apply Recommendation schema
+class ApplyRecommendationRequest(BaseModel):
+    action: str = Field(..., pattern="^(cancel|downgrade|negotiate|keep)$")
+    suggested_plan: Optional[str] = None
+    new_cost: Optional[float] = None
+    savings: float = 0.0
+
+class ApplyRecommendationResponse(BaseModel):
+    success: bool
+    action: str
+    message: str
+    new_monthly_cost: Optional[float] = None
+    savings: float
+    updated_subscription: Optional[Subscription] = None

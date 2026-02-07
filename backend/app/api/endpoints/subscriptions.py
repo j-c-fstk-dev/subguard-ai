@@ -8,7 +8,8 @@ from app.services.bank_analyzer import BankAnalyzer
 from app.services.optimizer import SubscriptionOptimizer
 from app.models.schemas import (
     Subscription, SubscriptionCreate, SubscriptionUpdate,
-    SubscriptionAnalysis, OptimizationRecommendation
+    SubscriptionAnalysis, OptimizationRecommendation,
+    ApplyRecommendationRequest, ApplyRecommendationResponse
 )
 from app.core.database import get_db, AsyncSession, SubscriptionDB
 from app.core.security import get_current_user
@@ -327,3 +328,52 @@ async def delete_subscription_endpoint(
     await db.commit()
     
     return {"success": True, "message": "Subscription deleted"}
+
+@router.post("/{subscription_id}/apply-recommendation")
+async def apply_recommendation(
+    subscription_id: str,
+    action_data: dict,
+    current_user = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Apply AI recommendation to subscription"""
+    from datetime import datetime
+    
+    result = await db.execute(
+        select(SubscriptionDB).where(SubscriptionDB.id == subscription_id)
+    )
+    subscription = result.scalar_one_or_none()
+    
+    if not subscription or subscription.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    
+    action = action_data.get("action")
+    message = ""
+    
+    if action == "cancel":
+        subscription.status = "cancelled"
+        message = f"✅ {subscription.service_name} marked as cancelled"
+        
+    elif action == "downgrade":
+        old_cost = subscription.monthly_cost
+        subscription.plan_name = action_data.get("suggested_plan", subscription.plan_name)
+        subscription.monthly_cost = action_data.get("new_cost", subscription.monthly_cost)
+        message = f"✅ {subscription.service_name} updated to {subscription.plan_name}"
+        
+    elif action == "negotiate":
+        subscription.notes = f"Negotiation pending - Target: {action_data.get('savings', 0):.2f} savings"
+        message = f"💬 Negotiation task created for {subscription.service_name}"
+        
+    else:  # keep
+        message = f"✅ Keeping {subscription.service_name} as is"
+    
+    await db.commit()
+    await db.refresh(subscription)
+    
+    return {
+        "success": True,
+        "action": action,
+        "message": message,
+        "new_monthly_cost": subscription.monthly_cost,
+        "savings": action_data.get("savings", 0)
+    }   

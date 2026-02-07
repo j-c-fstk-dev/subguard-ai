@@ -1,5 +1,8 @@
 'use client';
+import { useState } from 'react';
 import { X, Sparkles, TrendingDown, Target, CheckCircle, AlertCircle } from 'lucide-react';
+import { applyRecommendation } from '@/lib/subscriptions';
+import { showSuccess, showError } from '@/lib/toast';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
@@ -16,6 +19,9 @@ interface AIAnalysis {
 interface AIAnalysisModalProps {
   open: boolean;
   onClose: () => void;
+  onSuccess: () => void;
+  subscriptionId: string;
+  currentCost: number;
   serviceName: string;
   analysis: AIAnalysis | null;
   loading?: boolean;
@@ -23,12 +29,41 @@ interface AIAnalysisModalProps {
 
 export default function AIAnalysisModal({ 
   open, 
-  onClose, 
+  onClose,
+  onSuccess,
+  subscriptionId,
+  currentCost,
   serviceName, 
   analysis,
   loading = false
 }: AIAnalysisModalProps) {
   if (!open) return null;
+
+const [applying, setApplying] = useState(false);
+
+  const handleApply = async () => {
+    if (!analysis) return;
+    
+    setApplying(true);
+    try {
+      await applyRecommendation(subscriptionId, {
+        action: analysis.recommendation_type,
+        suggested_plan: analysis.suggested_plan,
+        new_cost: analysis.monthly_savings > 0 
+          ? currentCost - analysis.monthly_savings 
+          : currentCost,
+        savings: analysis.monthly_savings
+      });
+      
+      showSuccess(`✅ Recommendation applied successfully!`);
+      onSuccess();
+      onClose();
+    } catch (error) {
+      showError('Failed to apply recommendation');
+    } finally {
+      setApplying(false);
+    }
+  };
 
   const getSavingsBadge = () => {
     if (!analysis) return null;
@@ -187,10 +222,15 @@ export default function AIAnalysisModal({
             Close
           </Button>
           {analysis && analysis.monthly_savings > 0 && (
-            <Button variant="success">
-              Apply Recommendation
-            </Button>
-          )}
+            <Button 
+              variant="success" 
+              onClick={handleApply}
+              loading={applying}
+              disabled={applying}
+            >
+    {applying ? 'Applying...' : 'Apply Recommendation'}
+  </Button>
+)}
         </div>
       </Card>
     </div>
