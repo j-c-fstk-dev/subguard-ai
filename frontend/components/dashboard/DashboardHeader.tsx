@@ -2,6 +2,7 @@
 import { Bell, Search, Menu, User, Settings } from 'lucide-react';
 import { useState } from 'react';
 import Badge from '@/components/ui/Badge';
+import NotificationDropdown from './NotificationDropdown';
 
 interface UserType {
   id: string;
@@ -15,7 +16,6 @@ interface DashboardHeaderProps {
 export default function DashboardHeader({ user }: DashboardHeaderProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Pegar iniciais do email
   const getInitials = (email: string) => {
     return email.charAt(0).toUpperCase();
   };
@@ -45,10 +45,7 @@ export default function DashboardHeader({ user }: DashboardHeaderProps) {
           {/* Right side */}
           <div className="flex items-center gap-3">
             {/* Notifications */}
-            <button className="relative p-2 hover:bg-neutral-100 rounded-lg transition-colors group">
-              <Bell className="w-5 h-5 text-neutral-600 group-hover:text-neutral-900 transition-colors" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-danger-500 rounded-full animate-pulse"></span>
-            </button>
+            <NotificationDropdown />
 
             {/* Settings */}
             <button className="hidden sm:flex p-2 hover:bg-neutral-100 rounded-lg transition-colors group">

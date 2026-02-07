@@ -178,4 +178,23 @@ class ApplyRecommendationResponse(BaseModel):
     message: str
     new_monthly_cost: Optional[float] = None
     savings: float
-    updated_subscription: Optional[Subscription] = None
+    updated_subscription: Optional[Subscription] = None 
+
+# Activity schemas
+class ActivityBase(BaseModel):
+    activity_type: str
+    title: str
+    description: Optional[str] = None
+    meta_data: Optional[str] = None
+
+class ActivityCreate(ActivityBase):
+    user_id: str
+
+class ActivityResponse(ActivityBase):
+    id: str
+    user_id: str
+    created_at: datetime
+    read: int
+
+    class Config:
+        from_attributes = True    
