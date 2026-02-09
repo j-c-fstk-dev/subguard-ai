@@ -113,7 +113,9 @@ async def execute_optimization(
         # Execute based on action type
         action_result = await _execute_optimization_action(
             optimization, 
-            subscription
+            subscription,
+            db,
+            str(current_user.id)
         )
         
         # Update optimization record
@@ -346,7 +348,7 @@ async def get_monthly_trends(
     
     return trends
 
-async def _execute_optimization_action(optimization, subscription):
+async def _execute_optimization_action(optimization, subscription, db: AsyncSession, user_id: str):
     """Execute specific optimization action"""
     
     action_handlers = {
@@ -361,9 +363,9 @@ async def _execute_optimization_action(optimization, subscription):
     if not handler:
         return {"success": False, "message": "Unknown action type"}
     
-    return await handler(optimization, subscription)
+    return await handler(optimization, subscription, db, user_id)
 
-async def _execute_cancel(optimization, subscription):
+async def _execute_cancel(optimization, subscription, db: AsyncSession, user_id: str):
     """Execute cancellation"""
     # In production, would integrate with service APIs
     # For MVP, simulate success
@@ -379,7 +381,7 @@ async def _execute_cancel(optimization, subscription):
         "notes": f"Cancelled via SubGuard AI on {datetime.utcnow().date()}"
     }
 
-async def _execute_downgrade(optimization, subscription):
+async def _execute_downgrade(optimization, subscription, db: AsyncSession, user_id: str):
     """Execute plan downgrade"""
     
     return {
@@ -393,7 +395,7 @@ async def _execute_downgrade(optimization, subscription):
         "notes": f"Downgraded from {optimization.current_plan} to {optimization.recommended_plan}"
     }
 
-async def _execute_switch(optimization, subscription):
+async def _execute_switch(optimization, subscription, db: AsyncSession, user_id: str):
     """Execute service switch"""
     
     return {
@@ -407,7 +409,7 @@ async def _execute_switch(optimization, subscription):
         "notes": f"Service switch recommendation executed"
     }
 
-async def _execute_bundle(optimization, subscription):
+async def _execute_bundle(optimization, subscription, db: AsyncSession, user_id: str):
     """Execute bundling"""
     
     return {
@@ -421,19 +423,67 @@ async def _execute_bundle(optimization, subscription):
         "notes": "Bundle opportunity identified"
     }
 
-async def _execute_negotiate(optimization, subscription):
-    """Execute negotiation"""
+async def _execute_negotiate(optimization, subscription, db: AsyncSession, user_id: str):
+    """Execute negotiation - creates negotiation record instead of completing it"""
+    import uuid
+    from app.core.database import NegotiationDB, Activity
     
-    return {
-        "success": True,
-        "message": f"Negotiated discount for {subscription.service_name}",
-        "savings_achieved": optimization.monthly_savings * 0.6,  # Estimated
-        "next_steps": [
-            "Check email for negotiation results",
-            "Confirm new pricing with provider"
-        ],
-        "notes": f"Negotiation completed on {datetime.utcnow().date()}"
-    }
+    try:
+        # Create negotiation record
+        negotiation_id = str(uuid.uuid4())
+        negotiation = NegotiationDB(
+            id=negotiation_id,
+            optimization_id=optimization.id,
+            subscription_id=optimization.subscription_id,
+            user_id=user_id,
+            provider_name=subscription.service_name,
+            current_plan=optimization.current_plan,
+            proposed_savings=optimization.monthly_savings,
+            messages=[{
+                "role": "provider",
+                "content": f"Olá! Recebemos sua solicitação de negociação. Vi que você é cliente desde {(datetime.utcnow() - timedelta(days=365)).strftime('%B de %Y')}. Qual desconto você gostaria de solicitar?",
+                "timestamp": datetime.utcnow().isoformat()
+            }],
+            expires_at=datetime.utcnow() + timedelta(days=7)
+        )
+        
+        db.add(negotiation)
+        await db.commit()
+        
+        # Log activity
+        activity = Activity(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            activity_type="negotiation_created",
+            title=f"Negotiation started for {subscription.service_name}",
+            description=f"Created negotiation with potential savings of R$ {optimization.monthly_savings:.2f}",
+            meta_data=str({
+                "negotiation_id": negotiation_id,
+                "subscription_id": optimization.subscription_id,
+                "provider": subscription.service_name,
+                "proposed_savings": optimization.monthly_savings
+            }),
+            read=0
+        )
+        db.add(activity)
+        await db.commit()
+        
+        return {
+            "success": True,
+            "message": f"Negotiation started for {subscription.service_name}",
+            "negotiation_id": negotiation_id,
+            "next_steps": [
+                "Go to Negotiations page to chat with provider",
+                "Review and accept/reject the offer"
+            ],
+            "notes": f"Negotiation initiated on {datetime.utcnow().date()}"
+        }
+    except Exception as e:
+        logger.error(f"Error executing negotiation: {e}")
+        return {
+            "success": False,
+            "message": f"Error creating negotiation: {str(e)}"
+        }
 
 async def update_user_stats(user_id: str, savings: float, db: AsyncSession):
     """Background task to update user statistics"""

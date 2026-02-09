@@ -198,3 +198,47 @@ class ActivityResponse(ActivityBase):
 
     class Config:
         from_attributes = True    
+
+# Negotiation schemas
+class NegotiationMessage(BaseModel):
+    role: str  # "user" or "provider"
+    content: str
+    timestamp: str
+
+class NegotiationFinalOffer(BaseModel):
+    plan: str
+    price: float
+    savings: float
+    terms: str
+
+class NegotiationBase(BaseModel):
+    optimization_id: str
+    subscription_id: str
+    provider_name: str
+    current_plan: str
+    proposed_savings: float
+
+class NegotiationCreate(NegotiationBase):
+    pass
+
+class NegotiationUpdate(BaseModel):
+    messages: Optional[List[NegotiationMessage]] = None
+    status: Optional[str] = None
+    offer_accepted: Optional[bool] = None
+    final_offer: Optional[NegotiationFinalOffer] = None
+    notes: Optional[str] = None
+
+class NegotiationResponse(NegotiationBase):
+    id: str
+    user_id: str
+    status: str
+    messages: List[NegotiationMessage]
+    offer_accepted: bool
+    final_offer: Optional[NegotiationFinalOffer]
+    notes: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    expires_at: Optional[datetime]
+    
+    class Config:
+        from_attributes = True        

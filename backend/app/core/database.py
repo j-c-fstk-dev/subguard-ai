@@ -110,7 +110,35 @@ class OptimizationDB(Base):
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
- 
+
+class NegotiationDB(Base):
+    """Database model for negotiations"""
+    __tablename__ = "negotiations"
+    
+    id = Column(String, primary_key=True, default=generate_uuid)
+    optimization_id = Column(String, nullable=False, index=True)
+    subscription_id = Column(String, nullable=False, index=True)
+    user_id = Column(String, nullable=False, index=True)
+    
+    # Negotiation details
+    provider_name = Column(String, nullable=False)
+    current_plan = Column(String)
+    proposed_savings = Column(Float, default=0)
+    status = Column(String, default="active")  # active, accepted, rejected, expired
+    
+    # Chat messages (stored as JSON array)
+    messages = Column(JSON, default=list)  # [{role: "user"|"provider", content: str, timestamp: str}]
+    
+    # Result
+    offer_accepted = Column(Boolean, default=False)
+    final_offer = Column(JSON)  # {plan: str, price: float, savings: float, terms: str}
+    notes = Column(Text)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime)  # 7 days from creation
+
 # Database session dependency
 async def get_db():
     """Dependency to get database session"""
