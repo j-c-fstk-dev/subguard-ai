@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Sparkles, TrendingDown, Users, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
 import Card from '@/components/ui/Card';
@@ -18,8 +19,10 @@ interface Recommendation {
 }
 
 export default function Recommendations({ userId }: { userId: string }) {
+  const router = useRouter();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [executing, setExecuting] = useState<string | null>(null);
 
   useEffect(() => {
     loadRecommendations();
@@ -34,6 +37,25 @@ export default function Recommendations({ userId }: { userId: string }) {
       setRecommendations([]);
     } finally {
       setLoading(false);
+    }
+  }
+
+async function executeRecommendation(optimizationId: string, actionType: string) {
+    try {
+      setExecuting(optimizationId);
+      await api.post(`/api/optimizations/${optimizationId}/execute`);
+      
+      // Recarregar recommendations
+      loadRecommendations();
+      
+      // Se for negotiate, redirecionar
+      if (actionType === 'negotiate') {
+        setTimeout(() => router.push('/dashboard/negotiations'), 500);
+      }
+    } catch (error) {
+      console.error('Failed to execute recommendation:', error);
+    } finally {
+      setExecuting(null);
     }
   }
 
@@ -140,8 +162,10 @@ export default function Recommendations({ userId }: { userId: string }) {
                       size="sm"
                       variant="outline"
                       className="text-xs"
+                      onClick={() => executeRecommendation(rec.id, rec.recommendation_type)}
+                      disabled={executing === rec.id}
                     >
-                      {getRecommendationAction(rec.recommendation_type)}
+                      {executing === rec.id ? '⏳ Processing...' : getRecommendationAction(rec.recommendation_type)}
                     </Button>
                   </div>
                 </div>

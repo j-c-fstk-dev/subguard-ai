@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import SummaryCards from '@/components/dashboard/SummaryCards';
 import SubscriptionList from '@/components/dashboard/SubscriptionList';
@@ -13,6 +14,7 @@ const mockUser = {
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [showEmailModal, setShowEmailModal] = useState(false);
 
   const handleEmailConnected = () => {
@@ -44,8 +46,11 @@ export default function DashboardPage() {
                 >
                   Connect Email
                 </button>
-                <button className="w-full border border-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-50 transition">
-                  Add Subscription Manually
+                <button 
+                  onClick={() => router.push('/dashboard/negotiations')}
+                  className="w-full border border-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-50 transition"
+                >
+                  View Negotiations
                 </button>
                 <button className="w-full border border-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-50 transition">
                   Generate Monthly Report
