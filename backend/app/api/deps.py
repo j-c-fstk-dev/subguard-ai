@@ -6,9 +6,11 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.core.database import AsyncSessionLocal
 from app.core.config import settings
+from app.core.database import UserDB
 
 security = HTTPBearer()
 
@@ -20,9 +22,9 @@ async def get_db() -> AsyncSession:
 async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
     db: Annotated[AsyncSession, Depends(get_db)]
-):
+) -> UserDB:
     """
-    Valida o token JWT e retorna o email do usuário atual
+    Valida o token JWT e retorna o objeto User completo
     """
     token = credentials.credentials
     
@@ -37,6 +39,15 @@ async def get_current_user(
         email: str = payload.get("sub")
         if email is None:
             raise credentials_exception
-        return email
     except JWTError:
         raise credentials_exception
+    
+    # Buscar usuário no banco
+    from app.core.database import UserDB as UserModel
+    result = await db.execute(select(UserModel).filter(UserModel.email == email))
+    user = result.scalar_one_or_none()
+    
+    if user is None:
+        raise credentials_exception
+    
+    return user

@@ -94,6 +94,8 @@ class OptimizationDB(Base):
     # AI metadata
     confidence_score = Column(Float)
     reasoning = Column(Text)
+    steps_required = Column(JSON, default=list)
+    estimated_time_minutes = Column(Integer, default=0)
     
     # Status
     presented_to_user = Column(Boolean, default=False)
@@ -108,7 +110,7 @@ class OptimizationDB(Base):
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
-
+ 
 # Database session dependency
 async def get_db():
     """Dependency to get database session"""

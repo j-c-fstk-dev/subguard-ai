@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from typing import List, Optional
 import logging
 from sqlalchemy import select
+import json
+import uuid
 
 from app.services.email_parser import EmailParser
 from app.services.bank_analyzer import BankAnalyzer
@@ -12,6 +14,7 @@ from app.models.schemas import (
     ApplyRecommendationRequest, ApplyRecommendationResponse
 )
 from app.core.database import get_db, AsyncSession, SubscriptionDB
+from app.models.activity import Activity as ActivityDB
 from app.core.security import get_current_user
 
 router = APIRouter()
@@ -158,6 +161,18 @@ async def analyze_subscription(
     
     # Análise IA
     analysis = await ai_analyzer.analyze_subscription(sub_dict)
+
+    # Log activity
+    activity = ActivityDB(
+        id=str(uuid.uuid4()),
+        user_id=current_user.id,
+        activity_type="ai_analysis",
+        title=f"AI analyzed {subscription.service_name}",
+        description=f"Recommendation: {analysis['recommendation_type']} - Potential savings: R$ {analysis.get('monthly_savings', 0):.2f}/month",
+        meta_data=json.dumps({"subscription_id": str(subscription_id), "analysis": analysis})
+    )
+    db.add(activity)
+    await db.commit()
     
     return {
         "subscription_id": str(subscription_id),
@@ -235,6 +250,16 @@ async def create_subscription_endpoint(
         
         db.add(new_subscription)
         await db.commit()
+        # Log activity
+        activity = ActivityDB(
+            id=str(uuid.uuid4()),
+            user_id=current_user.id,
+            activity_type="subscription_added",
+            title=f"Added {subscription_data.service_name}",
+            description=f"New subscription: {subscription_data.plan_name} - R$ {subscription_data.monthly_cost}/month",
+            meta_data=json.dumps({"subscription_id": str(new_subscription.id)})
+        )
+        db.add(activity)
         await db.refresh(new_subscription)
         
         return Subscription(
@@ -325,6 +350,16 @@ async def delete_subscription_endpoint(
         raise HTTPException(status_code=404, detail="Subscription not found")
     
     await db.delete(subscription)
+    # Log activity
+    activity = ActivityDB(
+        id=str(uuid.uuid4()),
+        user_id=current_user.id,
+        activity_type="subscription_deleted",
+        title=f"Deleted {subscription.service_name}",
+        description=f"Removed {subscription.plan_name} subscription",
+        meta_data=json.dumps({"subscription_id": str(subscription_id)})
+    )
+    db.add(activity)
     await db.commit()
     
     return {"success": True, "message": "Subscription deleted"}
@@ -369,6 +404,21 @@ async def apply_recommendation(
     
     await db.commit()
     await db.refresh(subscription)
+
+    # Log activity
+    activity = ActivityDB(
+        id=str(uuid.uuid4()),
+        user_id=current_user.id,
+        activity_type="recommendation_applied",
+        title=f"Applied recommendation for {subscription.service_name}",
+        description=message,
+        meta_data=json.dumps({
+            "subscription_id": str(subscription_id),
+            "action": action,
+            "savings": action_data.get("savings", 0)
+        })
+    )
+    db.add(activity)
     
     return {
         "success": True,

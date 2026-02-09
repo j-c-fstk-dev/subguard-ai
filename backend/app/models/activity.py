@@ -4,6 +4,7 @@ from app.core.database import Base
 
 class Activity(Base):
     __tablename__ = "activities"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(String, primary_key=True, index=True)
     user_id = Column(String, nullable=False, index=True)

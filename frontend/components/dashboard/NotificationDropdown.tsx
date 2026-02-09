@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Bell, Check, X, Sparkles, Plus, Trash2, Mail, FileText } from 'lucide-react';
 import { fetchActivities, getUnreadCount, markAsRead, Activity } from '@/lib/activities';
 import Badge from '@/components/ui/Badge';
@@ -7,6 +8,7 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 
 export default function NotificationDropdown() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -185,7 +187,7 @@ export default function NotificationDropdown() {
                   fullWidth
                   onClick={() => {
                     setOpen(false);
-                    // TODO: Navigate to /activity page
+                    router.push('/dashboard/activities');
                   }}
                 >
                   View all activity
