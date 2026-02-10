@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from datetime import datetime, timedelta
 from typing import List, Optional
 import logging
 
@@ -163,8 +164,11 @@ async def execute_optimization(
         
     except Exception as e:
         await db.rollback()
-        logger.error(f"Error executing optimization: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        error_detail = f"{type(e).__name__}: {str(e)}"
+        logger.error(f"Error executing optimization: {error_detail}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=error_detail)
 
 @router.get("/results")
 async def get_optimization_results(
@@ -426,7 +430,8 @@ async def _execute_bundle(optimization, subscription, db: AsyncSession, user_id:
 async def _execute_negotiate(optimization, subscription, db: AsyncSession, user_id: str):
     """Execute negotiation - creates negotiation record instead of completing it"""
     import uuid
-    from app.core.database import NegotiationDB, Activity
+    from app.core.database import NegotiationDB
+    from app.models.activity import Activity
     
     try:
         # Create negotiation record

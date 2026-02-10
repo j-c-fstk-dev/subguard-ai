@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Sparkles, TrendingDown, Users, AlertCircle } from 'lucide-react';
+import { Sparkles, TrendingDown, Users, AlertCircle, DollarSign } from 'lucide-react';
 import api from '@/lib/api';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -10,12 +10,15 @@ import Badge from '@/components/ui/Badge';
 interface Recommendation {
   id: string;
   subscription_id: string;
-  recommendation_type: string;
-  suggestion: string;
-  potential_savings: number;
+  action_type: string;  // mudou de recommendation_type
+  current_plan: string;
+  recommended_plan: string;
+  reasoning: string;  // mudou de suggestion
+  monthly_savings: number;  // mudou de potential_savings
+  yearly_savings: number;
   confidence_score: number;
-  status: string;
-  service_name?: string;
+  estimated_time_minutes: number;
+  executed: boolean;
 }
 
 export default function Recommendations({ userId }: { userId: string }) {
@@ -40,7 +43,7 @@ export default function Recommendations({ userId }: { userId: string }) {
     }
   }
 
-async function executeRecommendation(optimizationId: string, actionType: string) {
+  async function executeRecommendation(optimizationId: string, actionType: string) {
     try {
       setExecuting(optimizationId);
       await api.post(`/api/optimizations/${optimizationId}/execute`);
@@ -65,8 +68,10 @@ async function executeRecommendation(optimizationId: string, actionType: string)
         return AlertCircle;
       case 'downgrade':
         return TrendingDown;
-      case 'family_plan':
+      case 'switch':
         return Users;
+      case 'negotiate':
+        return DollarSign;
       default:
         return Sparkles;
     }
@@ -75,17 +80,19 @@ async function executeRecommendation(optimizationId: string, actionType: string)
   const getRecommendationAction = (type: string) => {
     switch (type) {
       case 'cancel':
-        return 'Cancel subscription';
+        return 'Cancel';
       case 'downgrade':
-        return 'Downgrade Plan';
-      case 'family_plan':
-        return 'Switch to Family Plan';
+        return 'Downgrade';
+      case 'switch':
+        return 'Switch Plan';
+      case 'negotiate':
+        return 'Negotiate';
       default:
         return 'Apply';
     }
   };
 
-  const totalSavings = recommendations.reduce((sum, rec) => sum + rec.potential_savings, 0);
+  const totalSavings = recommendations.reduce((sum, rec) => sum + rec.monthly_savings, 0);
 
   if (loading) {
     return (
@@ -122,7 +129,7 @@ async function executeRecommendation(optimizationId: string, actionType: string)
         <>
           <div className="space-y-4 mb-6">
             {recommendations.map((rec, index) => {
-              const Icon = getRecommendationIcon(rec.recommendation_type);
+              const Icon = getRecommendationIcon(rec.action_type);
               return (
                 <div
                   key={rec.id}
@@ -135,14 +142,14 @@ async function executeRecommendation(optimizationId: string, actionType: string)
                         <Icon className="w-5 h-5 text-primary-600" />
                       </div>
                       <div>
-                        <h4 className="font-semibold text-neutral-900">{rec.service_name || 'Subscription'}</h4>
+                        <h4 className="font-semibold text-neutral-900">{rec.current_plan}</h4>
                         <p className="text-xs text-neutral-500 mt-0.5">
-                          {rec.suggestion.split('.')[0]}
+                          {rec.reasoning.split('.')[0]}
                         </p>
                       </div>
                     </div>
                     <Badge variant="success" size="sm" className="font-bold">
-                      Save R$ {rec.potential_savings.toFixed(2)}
+                      Save R$ {rec.monthly_savings.toFixed(2)}
                     </Badge>
                   </div>
 
@@ -151,21 +158,21 @@ async function executeRecommendation(optimizationId: string, actionType: string)
                       <div className="flex-1 bg-neutral-200 rounded-full h-1.5 w-16">
                         <div
                           className="bg-success-500 h-1.5 rounded-full transition-all duration-500"
-                          style={{ width: `${rec.confidence_score}%` }}
+                          style={{ width: `${rec.confidence_score * 100}%` }}
                         ></div>
                       </div>
                       <span className="text-xs text-neutral-500 font-medium">
-                        {rec.confidence_score}% match
+                        {(rec.confidence_score * 100).toFixed(0)}% match
                       </span>
                     </div>
                     <Button
                       size="sm"
                       variant="outline"
                       className="text-xs"
-                      onClick={() => executeRecommendation(rec.id, rec.recommendation_type)}
+                      onClick={() => executeRecommendation(rec.id, rec.action_type)}
                       disabled={executing === rec.id}
                     >
-                      {executing === rec.id ? '⏳ Processing...' : getRecommendationAction(rec.recommendation_type)}
+                      {executing === rec.id ? '⏳ Processing...' : getRecommendationAction(rec.action_type)}
                     </Button>
                   </div>
                 </div>

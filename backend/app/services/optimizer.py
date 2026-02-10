@@ -183,10 +183,10 @@ class SubscriptionOptimizer:
                 new_cost=new_cost,
                 monthly_savings=monthly_savings,
                 yearly_savings=yearly_savings,
-                confidence_score=analysis.confidence,
+                confidence_score=min(analysis.confidence / 100, 1.0),  # Convert % to decimal and cap at 1.0
                 reasoning=reasoning,
                 steps_required=self._get_steps_required(action),
-                estimated_time_minutes=estimated_time
+                estimated_time_minutes=estimated_time or 30  # Default 30 mins
             )
             
         except Exception as e:
