@@ -235,5 +235,26 @@
   }
 }
 
+/* Print Styles */
+@media print {
+  @page {
+    margin: 2cm;
+  }
 
+  .print\:hidden {
+    display: none !important;
+  }
+
+  .print\:block {
+    display: block !important;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  * {
+    box-shadow: none !important;
+  }
+}
 

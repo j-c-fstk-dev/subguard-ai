@@ -31,13 +31,14 @@ app.add_middleware(
 )
 
 # Incluir routers
-from app.api.endpoints import auth, subscriptions, optimizations, activities, negotiations
+from app.api.endpoints import auth, subscriptions, optimizations, activities, negotiations, reports
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(subscriptions.router, prefix="/api/subscriptions", tags=["Subscriptions"])
 app.include_router(optimizations.router, prefix="/api/optimizations", tags=["Optimizations"])
 app.include_router(activities.router, prefix="/api/activities", tags=["Activities"])
 app.include_router(negotiations.router, prefix="/api/negotiations", tags=["Negotiations"])
+app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 
 @app.get("/")
 async def root():

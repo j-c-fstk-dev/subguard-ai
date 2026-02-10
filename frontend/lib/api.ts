@@ -32,6 +32,17 @@ api.interceptors.response.use(
   },
   (error) => {
     console.error('❌ Response error:', error.response?.status, error.config?.url);
+    
+    // Se for erro 401 (não autenticado), redirecionar para login
+    if (error.response?.status === 401) {
+      // Remover token inválido
+      localStorage.removeItem('access_token');
+      // Redirecionar para login
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+    }
+    
     return Promise.reject(error);
   }
 );

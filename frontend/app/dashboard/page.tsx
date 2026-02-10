@@ -52,7 +52,10 @@ export default function DashboardPage() {
                 >
                   View Negotiations
                 </button>
-                <button className="w-full border border-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-50 transition">
+                <button 
+                  onClick={() => router.push('/dashboard/reports/monthly')}
+                  className="w-full border border-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-50 transition"
+                >
                   Generate Monthly Report
                 </button>
               </div>
