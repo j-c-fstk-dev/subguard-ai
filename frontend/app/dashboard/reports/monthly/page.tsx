@@ -14,7 +14,7 @@ import {
   ArrowLeft,
   Loader2
 } from 'lucide-react';
-import { MonthlyReport } from '@/lib/reports';
+import { MonthlyReport } from '@/lib/types/reports';
 import { getMonthlyReport as fetchMonthlyReport } from '@/lib/reportsWrapper';
 import Card, { CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
