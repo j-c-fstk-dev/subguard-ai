@@ -11,7 +11,7 @@ from app.core.database import UserDB as User
 
 router = APIRouter()
 
-@router.get("/", response_model=List[ActivityResponse])
+@router.get("/")
 async def get_activities(
     limit: int = 10,
     skip: int = 0,
@@ -26,7 +26,19 @@ async def get_activities(
     result = await db.execute(stmt)
     activities = result.scalars().all()
     
-    return activities
+    return [
+        {
+            "id": activity.id,
+            "user_id": activity.user_id,
+            "activity_type": activity.activity_type,
+            "title": activity.title,
+            "description": activity.description,
+            "meta_data": activity.meta_data,
+            "created_at": activity.created_at.isoformat() if activity.created_at else None,
+            "read": activity.read
+        }
+        for activity in activities
+    ]
 
 @router.post("/", response_model=ActivityResponse)
 async def create_activity(

@@ -77,7 +77,7 @@ class OptimizationRecommendationBase(BaseModel):
     subscription_id: str
     action_type: str = Field(..., pattern="^(cancel|downgrade|switch|bundle|negotiate)$")
     current_plan: str
-    recommended_plan: str
+    recommended_plan: Optional[str] = None
     current_cost: float
     new_cost: float
     monthly_savings: float
