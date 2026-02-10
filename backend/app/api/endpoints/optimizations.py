@@ -301,10 +301,11 @@ async def get_dashboard_summary(
                 "id": opt.id,
                 "action": opt.action_type,
                 "savings": opt.monthly_savings,
-                "date": opt.created_at.isoformat(),
+                "date": (opt.created_at.isoformat() if opt.created_at else None),
                 "executed": opt.executed
             }
             for opt in activity_result.scalars().all()
+            if opt.created_at is not None  # Filtra os que têm data válida
         ]
         
         return DashboardSummary(
@@ -445,8 +446,8 @@ async def _execute_negotiate(optimization, subscription, db: AsyncSession, user_
             current_plan=optimization.current_plan,
             proposed_savings=optimization.monthly_savings,
             messages=[{
-                "role": "provider",
-                "content": f"Olá! Recebemos sua solicitação de negociação. Vi que você é cliente desde {(datetime.utcnow() - timedelta(days=365)).strftime('%B de %Y')}. Qual desconto você gostaria de solicitar?",
+                "role": "ai",
+                "content": f"Hello! I've analyzed your {subscription.service_name} subscription ({optimization.current_plan} plan at R$ {subscription.monthly_cost:.2f}/month). Based on your {(datetime.utcnow() - timedelta(days=365)).strftime('%B %Y')} subscription start date, I believe we can negotiate a discount. I'm reaching out to {subscription.service_name} on your behalf to secure a potential saving of R$ {optimization.monthly_savings:.2f}/month. I'll keep you updated on their response.",
                 "timestamp": datetime.utcnow().isoformat()
             }],
             expires_at=datetime.utcnow() + timedelta(days=7)
@@ -478,8 +479,9 @@ async def _execute_negotiate(optimization, subscription, db: AsyncSession, user_
             "message": f"Negotiation started for {subscription.service_name}",
             "negotiation_id": negotiation_id,
             "next_steps": [
-                "Go to Negotiations page to chat with provider",
-                "Review and accept/reject the offer"
+                "Monitor this negotiation in your Negotiations page",
+                "Wait for the provider's response",
+                "Review and accept/reject their offer when ready"
             ],
             "notes": f"Negotiation initiated on {datetime.utcnow().date()}"
         }

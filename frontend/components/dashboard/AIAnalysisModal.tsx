@@ -1,13 +1,15 @@
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { X, Sparkles, TrendingDown, Target, CheckCircle, AlertCircle } from 'lucide-react';
-import { applyRecommendation } from '@/lib/subscriptions';
+import api from '@/lib/api';
 import { showSuccess, showError } from '@/lib/toast';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 
 interface AIAnalysis {
+  optimization_id: string;
   recommendation_type: string;
   monthly_savings: number;
   confidence: number;
@@ -39,25 +41,28 @@ export default function AIAnalysisModal({
 }: AIAnalysisModalProps) {
   if (!open) return null;
 
-const [applying, setApplying] = useState(false);
+  const router = useRouter();
+  const [applying, setApplying] = useState(false);
 
   const handleApply = async () => {
     if (!analysis) return;
     
     setApplying(true);
     try {
-      await applyRecommendation(subscriptionId, {
-        action: analysis.recommendation_type,
-        suggested_plan: analysis.suggested_plan,
-        new_cost: analysis.monthly_savings > 0 
-          ? currentCost - analysis.monthly_savings 
-          : currentCost,
-        savings: analysis.monthly_savings
-      });
+      const response = await api.post(
+        `/api/optimizations/${analysis.optimization_id}/execute`
+      );
       
-      showSuccess(`✅ Recommendation applied successfully!`);
-      onSuccess();
-      onClose();
+      if (response.data.success) {
+        showSuccess(`✅ Negotiation started! Redirecting to negotiations...`);
+        
+        setTimeout(() => {
+          router.push('/dashboard/negotiations');
+        }, 1500);
+        
+        onSuccess();
+        onClose();
+      }
     } catch (error) {
       showError('Failed to apply recommendation');
     } finally {

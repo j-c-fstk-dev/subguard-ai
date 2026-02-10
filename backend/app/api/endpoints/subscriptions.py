@@ -4,6 +4,7 @@ import logging
 from sqlalchemy import select
 import json
 import uuid
+from datetime import datetime, timedelta
 
 from app.services.email_parser import EmailParser
 from app.services.bank_analyzer import BankAnalyzer
@@ -13,7 +14,7 @@ from app.models.schemas import (
     SubscriptionAnalysis, OptimizationRecommendation,
     ApplyRecommendationRequest, ApplyRecommendationResponse
 )
-from app.core.database import get_db, AsyncSession, SubscriptionDB
+from app.core.database import get_db, AsyncSession, SubscriptionDB, OptimizationDB
 from app.models.activity import Activity as ActivityDB
 from app.core.security import get_current_user
 
@@ -174,7 +175,32 @@ async def analyze_subscription(
     db.add(activity)
     await db.commit()
     
+    # Create optimization record from analysis
+    optimization_id = str(uuid.uuid4())
+    optimization = OptimizationDB(
+        id=optimization_id,
+        subscription_id=str(subscription_id),
+        user_id=current_user.id,
+        action_type=analysis.get("recommendation_type", "negotiate"),
+        current_plan=subscription.plan_name,
+        recommended_plan=analysis.get("suggested_plan", subscription.plan_name),
+        current_cost=subscription.monthly_cost,
+        new_cost=analysis.get("new_cost", subscription.monthly_cost),
+        monthly_savings=analysis.get("monthly_savings", 0),
+        yearly_savings=analysis.get("yearly_savings", 0),
+        confidence_score=analysis.get("confidence", 0.75),
+        reasoning=analysis.get("reasoning", ""),
+        steps_required=analysis.get("action_steps", []),
+        estimated_time_minutes=15,
+        presented_to_user=True,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+    db.add(optimization)
+    await db.commit()
+    
     return {
+        "optimization_id": optimization_id,
         "subscription_id": str(subscription_id),
         "service_name": subscription.service_name,
         "analysis": analysis,

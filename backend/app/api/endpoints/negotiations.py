@@ -358,3 +358,141 @@ def _get_provider_response(user_message: str, provider_name: str) -> str:
     
     # Retorna resposta pseudo-aleatória
     return provider_responses[len(user_message) % len(provider_responses)]
+@router.post("/{negotiation_id}/message")
+async def send_message(
+    negotiation_id: str,
+    message: str,
+    current_user = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Send a message in negotiation (AI will respond as provider)"""
+    from sqlalchemy import select, update
+    from app.core.database import NegotiationDB
+    from app.services.ai_negotiator import AINegotiator
+    import json
+    
+    # Get negotiation
+    result = await db.execute(
+        select(NegotiationDB).where(
+            NegotiationDB.id == negotiation_id,
+            NegotiationDB.user_id == current_user.id
+        )
+    )
+    negotiation = result.scalar_one_or_none()
+    
+    if not negotiation:
+        raise HTTPException(status_code=404, detail="Negotiation not found")
+    
+    # Parse current messages
+    current_messages = json.loads(negotiation.messages) if isinstance(negotiation.messages, str) else negotiation.messages
+    
+    # Add user message
+    current_messages.append({
+        "role": "user",
+        "content": message,
+        "timestamp": datetime.utcnow().isoformat()
+    })
+    
+    # AI generates provider response
+    ai_negotiator = AINegotiator()
+    provider_response = await ai_negotiator.generate_provider_response(
+        provider_name=negotiation.provider_name,
+        current_plan=negotiation.current_plan,
+        proposed_savings=negotiation.proposed_savings,
+        message_history=current_messages
+    )
+    
+    current_messages.append({
+        "role": "provider",
+        "content": provider_response["content"],
+        "timestamp": datetime.utcnow().isoformat()
+    })
+    
+    # Check if should generate final offer
+    if provider_response.get("ready_for_offer"):
+        final_offer = {
+            "plan": negotiation.current_plan,
+            "price": provider_response["offer_price"],
+            "savings": negotiation.proposed_savings,
+            "terms": provider_response["offer_terms"]
+        }
+        
+        await db.execute(
+            update(NegotiationDB)
+            .where(NegotiationDB.id == negotiation_id)
+            .values(
+                messages=json.dumps(current_messages),
+                final_offer=json.dumps(final_offer),
+                updated_at=datetime.utcnow()
+            )
+        )
+    else:
+        await db.execute(
+            update(NegotiationDB)
+            .where(NegotiationDB.id == negotiation_id)
+            .values(
+                messages=json.dumps(current_messages),
+                updated_at=datetime.utcnow()
+            )
+        )
+    
+    await db.commit()
+    
+    return {
+        "messages": current_messages,
+        "final_offer": final_offer if provider_response.get("ready_for_offer") else None
+    }
+
+@router.post("/{negotiation_id}/accept")
+async def accept_offer(
+    negotiation_id: str,
+    current_user = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Accept the final offer"""
+    from sqlalchemy import select, update
+    from app.core.database import NegotiationDB, Activity
+    import json
+    import uuid
+    
+    result = await db.execute(
+        select(NegotiationDB).where(
+            NegotiationDB.id == negotiation_id,
+            NegotiationDB.user_id == current_user.id
+        )
+    )
+    negotiation = result.scalar_one_or_none()
+    
+    if not negotiation:
+        raise HTTPException(status_code=404, detail="Negotiation not found")
+    
+    # Update negotiation
+    await db.execute(
+        update(NegotiationDB)
+        .where(NegotiationDB.id == negotiation_id)
+        .values(
+            status="accepted",
+            offer_accepted=True,
+            updated_at=datetime.utcnow()
+        )
+    )
+    
+    # Log activity
+    activity = Activity(
+        id=str(uuid.uuid4()),
+        user_id=current_user.id,
+        activity_type="negotiation_accepted",
+        title=f"Offer accepted for {negotiation.provider_name}",
+        description=f"Accepted negotiation with savings of R$ {negotiation.proposed_savings:.2f}/month",
+        meta_data=json.dumps({
+            "negotiation_id": negotiation_id,
+            "provider": negotiation.provider_name,
+            "savings": negotiation.proposed_savings
+        }),
+        read=0
+    )
+    db.add(activity)
+    
+    await db.commit()
+    
+    return {"success": True, "message": "Offer accepted successfully!"}

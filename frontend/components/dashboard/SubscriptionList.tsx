@@ -23,6 +23,7 @@ interface Subscription {
 }
 
 interface AIAnalysis {
+  optimization_id: string;
   recommendation_type: string;
   monthly_savings: number;
   confidence: number;
@@ -89,8 +90,11 @@ export default function SubscriptionList({ userId }: { userId: string }) {
   
   try {
     const response = await api.post(`/api/subscriptions/${id}/analyze`);
-    const { analysis } = response.data;
-    setCurrentAnalysis(analysis);
+    const { analysis, optimization_id } = response.data;
+    setCurrentAnalysis({
+      ...analysis,
+      optimization_id
+    });
   } catch (error) {
     console.error('Error analyzing subscription:', error);
     setCurrentAnalysis(null);
