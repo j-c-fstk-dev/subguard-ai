@@ -1,12 +1,14 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { fetchActivities } from '@/lib/activities';
+import { useRouter } from 'next/navigation';
+import { fetchActivities, Activity } from '@/lib/activities';
 import Card from '@/components/ui/Card';
 import { Clock, Mail, Sparkles, Plus, Trash2, FileText } from 'lucide-react';
 
 export default function ActivitiesPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     loadActivities();
@@ -30,6 +32,8 @@ export default function ActivitiesPage() {
       case 'subscription_added': return <Plus className="w-5 h-5 text-green-600" />;
       case 'subscription_deleted': return <Trash2 className="w-5 h-5 text-red-600" />;
       case 'report_generated': return <FileText className="w-5 h-5 text-orange-600" />;
+      case 'recommendation_applied': return <Sparkles className="w-5 h-5 text-primary-600" />;
+      case 'negotiation_created': return <FileText className="w-5 h-5 text-primary-600" />;
       default: return <Clock className="w-5 h-5 text-neutral-600" />;
     }
   };
@@ -44,22 +48,47 @@ export default function ActivitiesPage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {activities.map((activity: any) => (
-            <Card key={activity.id} className="p-4 hover:shadow-md transition">
-              <div className="flex items-start gap-4">
-                <div className="p-2 bg-neutral-100 rounded-lg">
-                  {getIcon(activity.activity_type)}
+          {activities.map((activity) => {
+            const isNegotiationActivity = 
+              activity.activity_type === 'recommendation_applied' || 
+              activity.activity_type === 'negotiation_created';
+            
+            const handleClick = () => {
+              if (isNegotiationActivity) {
+                router.push('/dashboard/negotiations');
+              }
+            };
+
+            return (
+              <Card 
+                key={activity.id} 
+                className={`p-4 transition ${
+                  isNegotiationActivity 
+                    ? 'hover:shadow-lg hover:border-primary-300 cursor-pointer' 
+                    : 'hover:shadow-md'
+                }`}
+                onClick={handleClick}
+              >
+                <div className="flex items-start gap-4">
+                  <div className="p-2 bg-neutral-100 rounded-lg">
+                    {getIcon(activity.activity_type)}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-neutral-900">{activity.title}</h3>
+                    <p className="text-sm text-neutral-600 mt-1">{activity.description}</p>
+                    <p className="text-xs text-neutral-500 mt-2">
+                      {new Date(activity.created_at).toLocaleString()}
+                    </p>
+                    {isNegotiationActivity && (
+                      <p className="text-xs text-primary-600 mt-2 font-medium">
+                        Click to view negotiation →
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-neutral-900">{activity.title}</h3>
-                  <p className="text-sm text-neutral-600 mt-1">{activity.description}</p>
-                  <p className="text-xs text-neutral-500 mt-2">
-                    {new Date(activity.created_at).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
