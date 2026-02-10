@@ -139,12 +139,22 @@ export default function NotificationDropdown() {
                   <p>No notifications yet</p>
                 </div>
               ) : (
-                activities.map((activity) => (
+                activities.map((activity) => {
+                  const isNegotiationActivity = activity.activity_type === 'recommendation_applied' || activity.activity_type === 'negotiation_created';
+                  const handleActivityClick = () => {
+                    if (isNegotiationActivity) {
+                      router.push('/dashboard/negotiations');
+                      setOpen(false);
+                    }
+                  };
+                  
+                  return (
                   <div
                     key={activity.id}
-                    className={`p-4 border-b border-neutral-100 hover:bg-neutral-50 transition-colors ${
+                    onClick={handleActivityClick}
+                    className={`p-4 border-b border-neutral-100 transition-colors cursor-pointer ${
                       activity.read === 0 ? 'bg-primary-50/30' : ''
-                    }`}
+                    } ${isNegotiationActivity ? 'hover:bg-primary-100/50' : 'hover:bg-neutral-50'}`}
                   >
                     <div className="flex items-start gap-3">
                       <div className="p-2 bg-neutral-100 rounded-lg flex-shrink-0">
@@ -162,10 +172,18 @@ export default function NotificationDropdown() {
                         <p className="text-xs text-neutral-500 mt-1">
                           {formatTime(activity.created_at)}
                         </p>
+                        {isNegotiationActivity && (
+                          <p className="text-xs text-primary-600 mt-1 font-medium">
+                            Click to view negotiation →
+                          </p>
+                        )}
                       </div>
                       {activity.read === 0 && (
                         <button
-                          onClick={() => handleMarkAsRead(activity.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMarkAsRead(activity.id);
+                          }}
                           className="p-1 hover:bg-neutral-200 rounded transition-colors flex-shrink-0"
                           title="Mark as read"
                         >
@@ -174,7 +192,8 @@ export default function NotificationDropdown() {
                       )}
                     </div>
                   </div>
-                ))
+                );
+                })
               )}
             </div>
 
